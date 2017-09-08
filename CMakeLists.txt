@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(landing_module)
+project(test_module)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
@@ -147,8 +147,9 @@ include_directories(
 # add_executable(${PROJECT_NAME}_node src/landing_module_node.cpp)
 add_executable(${PROJECT_NAME}_node
         src/target_detector.cpp
-        include/landing_module/target_detector.h
-	src/test.cpp
+        include/test_module/target_detector.h
+    	src/test.cpp
+)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

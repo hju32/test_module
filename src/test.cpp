@@ -3,6 +3,7 @@
 //
 
 #include <ros/ros.h>
+#include <test_module/target_detector.h>
 
 
 /**
@@ -17,8 +18,8 @@ int main(int argc, char** argv) {
     ros::NodeHandle nh("~");
 
     ros::Rate rate(60);
+    target_detector detector(nh);
 
-    search_controller controller(nh);
 
 //    std::cout << "init complete" << std::endl;
 

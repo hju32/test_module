@@ -41,6 +41,9 @@
   <!--   <test_depend>gtest</test_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
   <depend>rviz</depend>
+  <depend>geometry_msgs</depend>
+  <depend>mavros</depend>
+  <depend>mavros_msgs</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>message_filters</depend>
