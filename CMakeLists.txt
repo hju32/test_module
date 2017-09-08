@@ -151,6 +151,10 @@ add_executable(${PROJECT_NAME}_node
     	src/test.cpp
 )
 
+add_executable(${PROJECT_NAME}_test_node
+	src/image_publisher.cpp
+)
+
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
