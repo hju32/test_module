@@ -1,7 +1,7 @@
 <launch>
 
      <node pkg="test_module" name="test_module_node" type="test_module_node" output="screen">
-        <remap from="test_module_node/image" to="/test/image"/>
+        <remap from="test_module_node/image" to="/camera/image"/>
         <param name="h_fov" type="double" value="90"/>
         <param name="search_altitude" type="double" value="50"/>
     </node>

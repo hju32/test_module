@@ -4,6 +4,7 @@
 //
 
 #include <test_module/target_detector.h>
+#include <ros/console.h>
 
 /**
  * initializes all ROS related callbacks and advertisements
@@ -115,6 +116,7 @@ void target_detector::images_callback(const sensor_msgs::ImageConstPtr &imageMsg
     cv_bridge::CvImagePtr src_gray_ptr;
     cv_bridge::CvImagePtr src_ptr;
 
+    printf("callback called\n");
     if (search_mode) {
         try {
             src_gray_ptr = cv_bridge::toCvCopy(imageMsg, sensor_msgs::image_encodings::MONO8);
@@ -130,6 +132,8 @@ void target_detector::images_callback(const sensor_msgs::ImageConstPtr &imageMsg
         if (target_found) {
             if (log) log_detection(src_ptr->image, src_gray_ptr->image);
             last_detection = ros::Time::now();
+        } else {
+            printf("target not found");
         }
 
         image_pub_.publish(src_ptr->toImageMsg());
@@ -155,4 +159,5 @@ void target_detector::log_detection(cv::Mat &image, cv::Mat &gray_image) {
                                                 std::max(int(target_location.y - 9), 0), 20, 20));
     cv::imwrite(image_file_name.str(), image);
     cv::imwrite(patch_file_name.str(), success_patch);
+    printf("image written");
 }
