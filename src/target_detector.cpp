@@ -132,8 +132,9 @@ void target_detector::images_callback(const sensor_msgs::ImageConstPtr &imageMsg
         if (target_found) {
             if (log) log_detection(src_ptr->image, src_gray_ptr->image);
             last_detection = ros::Time::now();
+            printf("target found\n\n");
         } else {
-            printf("target not found");
+            printf("target not found\n\n");
         }
 
         image_pub_.publish(src_ptr->toImageMsg());
