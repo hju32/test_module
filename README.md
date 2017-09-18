@@ -24,3 +24,16 @@ One crossing each ROI
 Then, score each crossing, based on following criterion:
 Check length of crossed edges, does it look like our chessboard?
 Check color near crossing, are they alternating black/white?
+
+## Issues
+When close to target, whites in target will be considered mode, therefore ROI may filter target out.
+This appears in clip1( 1:09-1:20 )
+
+Some points get picked up in the pre-processing routine as flashing dots that appear intermittently from frame to frame
+This appears in clip1( 20-30, 49-52 )
+
+## Suggestions
+Change target to non-directional pattern, like concentric circles
+
+## Notes
+Gopro 1080p delivers usable source at 100ft altitute. 
