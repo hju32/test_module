@@ -13,6 +13,9 @@ import warnings
 from scipy.ndimage.measurements import label
 from moviepy.editor import VideoFileClip
 
+from timeUtil import execution_timer
+t = execution_timer(True)
+
 #matplotlib.style.use('ggplot')
 
 #helper functions
@@ -107,12 +110,23 @@ def expand_grayimg(image):
 #some testing procedure for pre-processing
 # TODO - break the function up to pre-process, ROI, etc.
 def pre(image):
+    t.s()
+
+    t.s("convert color")
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    t.e("convert color")
+
     kernel_size = 17
+
+    t.s("Gaussian Blur")
     gray = cv2.GaussianBlur(gray, (kernel_size, kernel_size), 0)
+    t.e("Gaussian Blur")
+
     #reduce color
     gray = gray//10*10
-    #reduce scale, calculate background
+
+    t.s("find mode")
+    #reduce scale, calculate background, find mode
     thumbnail = cv2.resize(gray, (40,20), interpolation = cv2.INTER_NEAREST)
     thumbnail = thumbnail.ravel()
     value, count = np.unique(thumbnail, return_counts = True)
@@ -120,6 +134,9 @@ def pre(image):
     # the most frequent 6 colors are considered mode
     mode = sort_index[-6:]
     mode = value[mode]
+    t.e("find mode")
+
+    t.s("make mode mask")
     #one for all non-mode pixels
     mask = np.isin(gray, mode, invert=True).astype(np.uint8)
     mask = mask*255
@@ -128,6 +145,7 @@ def pre(image):
     mask = cv2.blur(mask, (kernel_size, kernel_size))
     threshold = 100
     mask[mask<=threshold] = 0
+    t.e("make mode mask")
 
     # this variable defines pattern used to determine connectivity of features(none-zero pixles)
     # see generate_binary_structure and binary_dilation for extension
@@ -141,6 +159,8 @@ def pre(image):
     # there is more than enough space since some labels will be discarded
     roi = np.zeros([num_features, 2, 2])
     roi_count = 0
+
+    t.s("draw box")
     for i in range(1,num_features+1):
         # coordinates for all pixels
         coordinates = np.array((labels==i).astype(np.uint8).nonzero())
@@ -162,12 +182,14 @@ def pre(image):
             # --- DEBUG
             # Draw the box on the image
             cv2.rectangle(image, bbox[0], bbox[1], (0,0,255), 4)
+    t.e("draw box")
 
     ##### ---- DEBUG
     #print(len(value))
     #plt.figure();
     #plt.bar( np.arange(len(value) ), count, align='center' )
     #plt.show()
+    t.e()
     return image
 
 #drop some frames to speed things up
@@ -220,7 +242,8 @@ test_image = cv2.imread(filename)
 #exit()
 
 output_filename = "/Users/Nickzhang/uav_challenge/test_module/resources/output/output.mp4"
-clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/GOPR0010.MP4").subclip(60,80)
+clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/GOPR0010.MP4").subclip(60,65)
 processed_clip = clip.fl_image(pipeline) #NOTE: this function expects color images!!
 processed_clip.write_videofile(output_filename, audio=False)
 print("average processing frequency = " + str(1/avg_value))
+t.summary()
