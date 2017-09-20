@@ -29,7 +29,7 @@ class execution_timer:
         else:
             self.g_duration_avg = self.g_duration_avg*self.g_sample_count+duration
             self.g_sample_count = self.g_sample_count +1
-            self.g_duration_avg = self.g_duration/self.g_sample_count
+            self.g_duration_avg = self.g_duration_avg/self.g_sample_count
         return duration
         
     def start(self, name = None):
@@ -75,30 +75,32 @@ class execution_timer:
         fraction = dict(self.t_avg)
         fraction.update((x, y/total_time) for x, y in fraction.items()) 
         for key,value in fraction.items():
-            print(key+'\t\t'+ "{0:.2f}".format(value))
+            print(key+'\t\t'+ "{0:.3f}".format(value)+'')
 
         unaccounted_time = 1-sum_time/total_time
-        print('avg frequency = '+"{0:.2f}".format(1/self.g_duration_avg)+'Hz')
-        print('unaccounted time = '+"{0:.2f}".format(unaccounted_time))
+        print('avg frequency = '+"{0:.3f}".format(1/self.g_duration_avg)+'Hz')
+        print('unaccounted time = '+"{0:.3f}".format(unaccounted_time)+'')
         return
 
 #sample usage        
 if __name__ == '__main__':
     from time import sleep
     t = execution_timer(True)
-    t.s()
 
-    t.s('sleep2')
-    sleep(2)
-    t.e('sleep2')
+    for i in range(1,3):
+        t.s()
 
-    t.s('sleep1')
-    sleep(1)
-    t.e('sleep1')
-    #unaccounted time
-    sleep(1)
+        t.s('sleep2')
+        sleep(0.2)
+        t.e('sleep2')
 
-    t.e()
+        t.s('sleep1')
+        sleep(0.1)
+        t.e('sleep1')
+        #unaccounted time
+        sleep(1)
+
+        t.e()
     t.summary()
         
         
