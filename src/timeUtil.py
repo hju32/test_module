@@ -4,75 +4,101 @@ class execution_timer:
     
     def __init__(self, enable = False):
         self.enabled = enable
-        self.table = {}
         self.t_start = {}
-        self.t_end = {}
-        return
+        self.t_avg = {}
+        self.t_count = {}
+        self.g_start = None
+        self.g_end = None
+        self.g_duration_avg = None
+        self.g_sample_count = 0
 
-    def start(self, name):
+    def global_start(self):
         if not self.enabled:
             return
+        self.g_start = time()
+        return
+
+    def global_end(self):
+        if not self.enabled:
+            return
+        self.g_end = time()
+        duration = self.g_end-self.g_start
+        if (self.g_duration_avg is None):
+            self.g_duration_avg = duration
+            self.g_sample_count = 1
+        else:
+            self.g_duration_avg = self.g_duration_avg*self.g_sample_count+duration
+            self.g_sample_count = self.g_sample_count +1
+            self.g_duration_avg = self.g_duration/self.g_sample_count
+        return duration
+        
+    def start(self, name = None):
+        if not self.enabled:
+            return
+        if name is None:
+            return self.global_start()
+
         self.t_start[name] = time()
         return
 
-    def end(self, name):
+    def end(self, name = None):
         if not self.enabled:
             return
-        self.t_end[name] = time()
-        self.table[name] = self.t_end[name] - self.t_start[name]
-        return
+        if name is None:
+            return self.global_end()
 
-    def get(self, name):
-        if not self.enabled:
-            return
-        return self.table[name]
+        duration = time()-self.t_start[name] 
+        if name in self.t_avg:
+            self.t_avg[name] = self.t_avg[name]*self.t_count[name]+duration
+            self.t_count[name] = self.t_count[name] + 1
+            self.t_avg[name] = self.t_avg[name] / self.t_count[name]
+        else:
+            self.t_avg[name] = duration
+            self.t_count[name] = 1
+            
+        return duration
 
-    def s(self, n):
+    def s(self, n=None):
         return self.start(n)
         
-    def e(self, n):
+    def e(self, n=None):
         return self.end(n)
         
-    def g(self, n):
-        return self.get(n)
-
-    def clean(self):
-        if not self.enabled:
-            return
-        self.table = {}
-        self.t_start = {}
-        self.t_end = {}
-        return
-
-    def c(self):
-        return self.clean()
-
     def summary(self):
         if not self.enabled:
             return
-        total_time = sum(self.table.values())
-        fraction = dict(self.table)
+        #note: sum_time is sum of all fractions not global time
+        sum_time = sum(self.t_avg.values())
+        #g_duration_avg is time between start() and end() averaged
+        total_time = self.g_duration_avg
+        #make sure we don't mess with the original copy
+        fraction = dict(self.t_avg)
         fraction.update((x, y/total_time) for x, y in fraction.items()) 
         for key,value in fraction.items():
-            print(key+'\t\t'+ str(value))
+            print(key+'\t\t'+ "{0:.2f}".format(value))
 
-        print('total = '+str(total_time))
-        unaccounted_time = 1-sum(fraction.values())
-        print('unaccounted time = '+str(unaccounted_time))
+        unaccounted_time = 1-sum_time/total_time
+        print('avg frequency = '+"{0:.2f}".format(1/self.g_duration_avg)+'Hz')
+        print('unaccounted time = '+"{0:.2f}".format(unaccounted_time))
         return
 
-        
-#debugging stuff
+#sample usage        
 if __name__ == '__main__':
     from time import sleep
     t = execution_timer(True)
+    t.s()
+
     t.s('sleep2')
     sleep(2)
     t.e('sleep2')
+
     t.s('sleep1')
     sleep(1)
     t.e('sleep1')
+    #unaccounted time
     sleep(1)
+
+    t.e()
     t.summary()
         
         
