@@ -1,7 +1,7 @@
 # Created by Nick Zhang
 
 # This is a pipeline that tracks 2 by 2 chessboard pattern in an image/video
-
+ 
 import numpy as np
 import time
 import cv2
