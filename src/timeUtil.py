@@ -4,13 +4,19 @@ class execution_timer:
     
     def __init__(self, enable = False):
         self.enabled = enable
+        # sectional time counting
         self.t_start = {}
         self.t_avg = {}
         self.t_count = {}
+        # global time counting
         self.g_start = None
         self.g_end = None
         self.g_duration_avg = None
         self.g_sample_count = 0
+        # tracked variables
+        self.tracked = {}
+        self.tracked_count = {}
+
 
     def global_start(self):
         if not self.enabled:
@@ -32,6 +38,19 @@ class execution_timer:
             self.g_duration_avg = self.g_duration_avg/self.g_sample_count
         return duration
         
+    def track(self, name, var):
+        if not self.enabled:
+            return
+        if name in self.tracked:
+            self.tracked[name] = self.tracked[name]*self.tracked_count[name]+var
+            self.tracked_count[name] = self.tracked_count[name] + 1
+            self.tracked[name] = self.tracked[name] / self.tracked_count[name]
+        else:
+            self.tracked[name] = var
+            self.tracked_count[name] = 1
+        return
+        
+
     def start(self, name = None):
         if not self.enabled:
             return
@@ -67,6 +86,12 @@ class execution_timer:
     def summary(self):
         if not self.enabled:
             return
+        # tracked variables
+        print('-----Variables--------')
+        for key,value in tracked.items():
+            print(key+'\t\t'+str(value))
+        print('-------Time-----------')
+        #tracked times
         #note: sum_time is sum of all fractions not global time
         sum_time = sum(self.t_avg.values())
         #g_duration_avg is time between start() and end() averaged
