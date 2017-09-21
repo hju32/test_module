@@ -1,13 +1,18 @@
-This project aims to be a robust algorithm to detect monocolor target.
+Target detection code for Gatech DBF 2018 Medical Express Challenge
 
+This project aims to be a robust algorithm to detect 2 by 2 chessboard pattern
+### Author
+Original Author: Eric Fang (CMU)
+Current Author: Nick Zhang nickzhang@gatech.edu
 
-## TO-DOs
-Go-pro undistortion
-fix white balance (find ways how)
+## TO-DOs - Tickets
 
-run code on win-pc
-run pipeline on sample pics
-run tracking pipeline on vid
+---
+|Description    | Status    | comment|
+|Reduce box drawing time| open |
+|Go-pro undistortion | Suspended| we will do that for real computer|
+|fix white balance (find ways how)|closed| update: our GoPro can't do that
+---
 
 ## Pipeline:(single image, no access to historic data)
 Pre-adjustment:
