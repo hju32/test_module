@@ -7,12 +7,11 @@ Current Author: Nick Zhang nickzhang@gatech.edu
 
 ## TO-DOs - Tickets
 
----
 |Description    | Status    | comment|
-|Reduce box drawing time| open |
+|---|---|---|
+|Reduce box drawing time| open ||
 |Go-pro undistortion | Suspended| we will do that for real computer|
-|fix white balance (find ways how)|closed| update: our GoPro can't do that
----
+|fix white balance (find ways how)|closed| update: our GoPro can't do that|
 
 ## Pipeline:(single image, no access to historic data)
 Pre-adjustment:
