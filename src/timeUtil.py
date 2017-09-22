@@ -88,7 +88,7 @@ class execution_timer:
             return
         # tracked variables
         print('-----Variables--------')
-        for key,value in tracked.items():
+        for key,value in self.tracked.items():
             print(key+'\t\t'+str(value))
         print('-------Time-----------')
         #tracked times
@@ -104,7 +104,7 @@ class execution_timer:
 
         unaccounted_time = 1-sum_time/total_time
         print('avg frequency = '+"{0:.3f}".format(1/self.g_duration_avg)+'Hz')
-        print('unaccounted time = '+"{0:.1f}".format(unaccounted_time)+' %')
+        print('unaccounted time = '+"{0:.1f}".format(unaccounted_time*100)+' %')
         return
 
 #sample usage        
@@ -124,6 +124,8 @@ if __name__ == '__main__':
         t.e('sleep1')
         #unaccounted time
         sleep(1)
+
+        t.track('var', 5)
 
         t.e()
     t.summary()

@@ -14,7 +14,7 @@ from scipy.ndimage.measurements import label
 from moviepy.editor import VideoFileClip
 
 from timeUtil import execution_timer
-t = execution_timer(True)
+t = execution_timer(False)
 
 #matplotlib.style.use('ggplot')
 
@@ -46,16 +46,42 @@ def findAOI(image):
 
     return [image.shape]
 
-def findCross(image, aoi):
+def findTarget(image, aoi):
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     kernel_size = 5
     gray_image = cv2.GaussianBlur(gray_image, (kernel_size, kernel_size), 0)
     #normalize
 
-    low_threshold = 200
-    high_threshold = 300
+    low_threshold = 100
+    high_threshold = 200
     edges = cv2.Canny(gray_image, low_threshold, high_threshold)
+    im2, contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_SIMPLE)
     return edges
+    color = [0,0,255]
+    # XXX- if countours = NOne
+    # TODO - can we do this vector style?
+    for c in contours:
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.03*peri, True)
+        if len(approx)>=2 and len(approx)<=7:
+            # use the bounding box to compute the aspect ratio
+            points = cv2.minAreaRect(approx)
+            box = cv2.boxPoints(points)
+            box = np.int0(box)
+ 
+            # compute the solidity of the original contour
+            #area = cv2.contourArea(c)
+            #hullArea = cv2.contourArea(cv2.convexHull(c))
+            #solidity = area / float(hullArea)
+
+            color = [0,0,255]
+            # draw all contours(only one)
+            contourIdx = -1;
+            thickness = 3
+            cv2.drawContours(image, [box], contourIdx, color, thickness)
+
+    return image
 
     plt.imshow(edges,cmap='gray')
     plt.show()
@@ -125,7 +151,6 @@ def pre(image):
     #reduce color
     gray = gray//10*10
 
-    t.s("find mode")
     #reduce scale, calculate background, find mode
     thumbnail = cv2.resize(gray, (40,20), interpolation = cv2.INTER_NEAREST)
     thumbnail = thumbnail.ravel()
@@ -134,12 +159,18 @@ def pre(image):
     # the most frequent 6 colors are considered mode
     mode = sort_index[-6:]
     mode = value[mode]
-    t.e("find mode")
 
     t.s("make mode mask")
     #one for all non-mode pixels
     mask = np.isin(gray, mode, invert=True).astype(np.uint8)
     mask = mask*255
+
+    low_threshold = 200
+    high_threshold = 300
+    edges = cv2.Canny(mask, low_threshold, high_threshold)
+    im2, contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_SIMPLE)
+
     kernel_size = 10
     #mask = cv2.GaussianBlur(mask,  (kernel_size, kernel_size), 10)
     mask = cv2.blur(mask, (kernel_size, kernel_size))
@@ -153,36 +184,56 @@ def pre(image):
     #label all remaining non-zero pixels, these SECTIONS are candidates for ROI
     labels, num_features = label(mask, structure=connection)
 
-    #eliminate sections with too few 'hot' pixels, this should filter out random dots.
 
     # initialization done for performance improvement
     # there is more than enough space since some labels will be discarded
     roi = np.zeros([num_features, 2, 2])
     roi_count = 0
 
-    t.s("draw box")
+    t.s("draw all box")
+    t.track('num_features', num_features)
     for i in range(1,num_features+1):
+
+        t.s('get coords')
         # coordinates for all pixels
         coordinates = np.array((labels==i).astype(np.uint8).nonzero())
         num_pixels = coordinates.shape[1]
+        t.e('get coords')
+
+        #eliminate sections with too few 'hot' pixels, this should filter out random dots.
+        if (num_pixels < 100):
+            continue
         
-        #draw a box around the hot pixels
+        t.s('cvt2numpy')
+        # ---  draw a box around the hot pixels
         # Identify x and y values of those pixels
         nonzeroy = np.array(coordinates[0])
         nonzerox = np.array(coordinates[1])
+        t.e('cvt2numpy')
+
         # Define a bounding box based on min/max x and y
+        t.s('find one box')
         bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
         bbox_size = (bbox[1][1]-bbox[0][1])*(bbox[1][0]-bbox[0][0])
-        occupance = num_pixels / bbox_size
+        t.e('find one box')
+
         # filter out sparce & tiny sections
+        t.s('kill low occ')
+        occupance = num_pixels / bbox_size
         if (occupance > 0.6) and (bbox_size > 150) :
             roi[roi_count] = bbox
             roi_count = roi_count + 1
+        t.e('kill low occ')
+
+        t.s('draw one box')
         if (roi_count > 0):
             # --- DEBUG
             # Draw the box on the image
             cv2.rectangle(image, bbox[0], bbox[1], (0,0,255), 4)
-    t.e("draw box")
+        t.e('draw one box')
+
+    t.e("draw all box")
+    t.track('boxes',roi_count)
 
     ##### ---- DEBUG
     #print(len(value))
@@ -205,7 +256,8 @@ def pipeline(image):
     counter = counter + 1
     if (counter%2 == 0) | (last_detection is None):
         t = time.time()
-        edges = pre(image)
+        edges = findTarget(image,1)
+        edges = expand_grayimg(edges)
         duration = time.time() - t
         if (avg_value is None):
             avg_item = avg_item + 1
@@ -226,7 +278,7 @@ def pipeline(image):
 filename = "/Users/Nickzhang/uav_challenge/test_module/resources/target/high1.png"
 filename = "/Users/Nickzhang/uav_challenge/test_module/resources/target/full1.png"
 #filename = "/Users/Nickzhang/uav_challenge/test_module/resources/target/high3.png"
-test_image = cv2.imread(filename)
+#test_image = cv2.imread(filename)
 
 #image = pre(test_image)
 #edges = image
@@ -242,7 +294,7 @@ test_image = cv2.imread(filename)
 #exit()
 
 output_filename = "/Users/Nickzhang/uav_challenge/test_module/resources/output/output.mp4"
-clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/GOPR0010.MP4").subclip(60,65)
+clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/GOPR0002.MP4").subclip(70,80)
 processed_clip = clip.fl_image(pipeline) #NOTE: this function expects color images!!
 processed_clip.write_videofile(output_filename, audio=False)
 print("average processing frequency = " + str(1/avg_value))
