@@ -1,9 +1,8 @@
 Target detection code for Gatech DBF 2018 Medical Express Challenge
 
-This project aims to be a robust algorithm to detect 2 by 2 chessboard pattern
+This project aims to be a robust algorithm to detect targets
 ### Author
-Original Author: Eric Fang (CMU)
-Current Author: Nick Zhang nickzhang@gatech.edu
+Author: Eric Fang (CMU), Nick Zhang nickzhang@gatech.edu
 
 ## TO-DOs - Tickets
 
