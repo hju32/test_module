@@ -46,40 +46,59 @@ def findAOI(image):
 
     return [image.shape]
 
-def findTarget(image, aoi):
+def findTarget(image):
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    kernel_size = 5
+    kernel_size = 11
+    gray_image = cv2.equalizeHist(gray_image)
     gray_image = cv2.GaussianBlur(gray_image, (kernel_size, kernel_size), 0)
-    #normalize
 
-    low_threshold = 100
-    high_threshold = 200
+    #find edge & contour
+    #low_threshold = 800
+    #high_threshold = 1200
+    low_threshold = 150
+    high_threshold = 300
     edges = cv2.Canny(gray_image, low_threshold, high_threshold)
     im2, contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_EXTERNAL,
                                 cv2.CHAIN_APPROX_SIMPLE)
-    return edges
+    #cv2.drawContours(image, contours, -1, [0,0,255], 3)
+    #return image
+
     color = [0,0,255]
     # XXX- if countours = NOne
     # TODO - can we do this vector style?
     for c in contours:
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.03*peri, True)
-        if len(approx)>=2 and len(approx)<=7:
+        if  True or (len(approx)>=4 and len(approx)<=9):
             # use the bounding box to compute the aspect ratio
-            points = cv2.minAreaRect(approx)
-            box = cv2.boxPoints(points)
-            box = np.int0(box)
- 
-            # compute the solidity of the original contour
-            #area = cv2.contourArea(c)
-            #hullArea = cv2.contourArea(cv2.convexHull(c))
-            #solidity = area / float(hullArea)
+            # box = ( center (x,y), (width, height), angle of rotation )
+            box = cv2.minAreaRect(approx)
+            points = cv2.boxPoints(box)
 
-            color = [0,0,255]
-            # draw all contours(only one)
-            contourIdx = -1;
-            thickness = 3
-            cv2.drawContours(image, [box], contourIdx, color, thickness)
+            # restrict aspect ratio
+            _, (w,h), _ = box
+            #was 8
+            if (w<5) or (h<5):
+                continue
+
+            aspectRatio = max(w,h)/min(w,h)
+ 
+            #compute the solidity of the original contour
+            area = cv2.contourArea(c)
+            hullArea = cv2.contourArea(cv2.convexHull(c))
+            solidity = area / float(hullArea)
+
+            if  (solidity > 0.5 and aspectRatio<1.5 and aspectRatio > 1.1):
+
+                color = [0,0,255]
+                # draw all contours(only one)
+                contourIdx = -1;
+                thickness = 2
+                box2draw = [np.int0(points)]
+                cv2.drawContours(image, box2draw, contourIdx, color, thickness)
+                color = [255,0,0]
+                cv2.drawContours(image, cv2.convexHull(c), contourIdx, color, thickness)
+                
 
     return image
 
@@ -256,8 +275,8 @@ def pipeline(image):
     counter = counter + 1
     if (counter%2 == 0) | (last_detection is None):
         t = time.time()
-        edges = findTarget(image,1)
-        edges = expand_grayimg(edges)
+        edges = findTarget(image)
+
         duration = time.time() - t
         if (avg_value is None):
             avg_item = avg_item + 1
@@ -272,29 +291,31 @@ def pipeline(image):
     else:
         return last_detection
 
+def test_image(filename):
+    test_image = cv2.imread(filename)
+
+    image = findTarget(test_image)
+    edges = image
+    _edges = np.zeros([edges.shape[0],edges.shape[1],3], dtype=np.uint8)
+    _edges[:,:,0] = edges
+    _edges[:,:,1] = edges
+    _edges[:,:,2] = edges
+    edges = _edges
+    image = edges
     
+    plt.imshow(image)
+    plt.show()
+    return
+        
 
 # test image filename
 filename = "/Users/Nickzhang/uav_challenge/test_module/resources/target/high1.png"
-filename = "/Users/Nickzhang/uav_challenge/test_module/resources/target/full1.png"
+filename = "/Users/Nickzhang/uav_challenge/test_module/resources/hard/hard1.png"
 #filename = "/Users/Nickzhang/uav_challenge/test_module/resources/target/high3.png"
-#test_image = cv2.imread(filename)
-
-#image = pre(test_image)
-#edges = image
-#_edges = np.zeros([edges.shape[0],edges.shape[1],3], dtype=np.uint8)
-#_edges[:,:,0] = edges
-#_edges[:,:,1] = edges
-#_edges[:,:,2] = edges
-#edges = _edges
-#image = edges
-#
-#plt.imshow(image)
-#plt.show()
+#test_image(filename)
 #exit()
-
 output_filename = "/Users/Nickzhang/uav_challenge/test_module/resources/output/output.mp4"
-clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/GOPR0002.MP4").subclip(70,80)
+clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/GOPR0002.MP4").subclip(70,73)
 processed_clip = clip.fl_image(pipeline) #NOTE: this function expects color images!!
 processed_clip.write_videofile(output_filename, audio=False)
 print("average processing frequency = " + str(1/avg_value))
