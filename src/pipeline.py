@@ -1,6 +1,8 @@
+# Vision Template
 # Created by Nick Zhang
 
-# This is a pipeline that tracks 2 by 2 chessboard pattern in an image/video
+# This file includes common methods used in Gatech DBF MedExpress, 
+# it should be the start point for different target candidates.
  
 import numpy as np
 import time
@@ -16,9 +18,7 @@ from moviepy.editor import VideoFileClip
 from timeUtil import execution_timer
 t = execution_timer(False)
 
-#matplotlib.style.use('ggplot')
-
-#helper functions
+#helper functions/routines
 
 #draw lines on img
 def draw_lines(img, lines, color=[255, 0, 0], thickness=1):
@@ -30,23 +30,36 @@ def show(img):
     plt.imshow(img)
     plt.show()
 
+# show gray image
 def showg(img):
     plt.imshow(img,cmap='gray')
     plt.show()
+# show heat image
+def show(img):
+    plt.imshow(img,cmap='heat')
+    plt.show()
 
 # find area of interest in an image
-# @return a list of coordinates defining boxes that contain area of interest
+# IMAGE:    original image
+# RETURN:   a list of coordinates defining boxes that contain area of interest
+# This should be implemented after we find a cheap way to eliminate some backgrounds
+# Your findTarget should be able to take AOI as an input, and examine only the AOIs.
+# For now you may ignore this
+
+# TODO - move what's in pre() here
 def findAOI(image):
 
-# do a histogram, find most common pixels
+    # do a histogram, find most common pixels
 
-# label all special pixels
+    # label all special pixels
 
-# draw box around special pixels
+    # draw box around special pixels
 
     return [image.shape]
 
-def findTarget(image):
+# main procedure to find target in image
+# for now it should draw visible marker around target
+def findTarget(image, aoi = None):
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     kernel_size = 11
     gray_image = cv2.equalizeHist(gray_image)
@@ -143,6 +156,7 @@ def box_around_labels(labels,num_features):
     # Return the image
     return img
 
+# expand a grayscale image to a color image
 def expand_grayimg(image):
 
     _image = np.zeros([image.shape[0],image.shape[1],3], dtype=np.uint8)
@@ -152,7 +166,7 @@ def expand_grayimg(image):
     image = _image
     return image
 
-#some testing procedure for pre-processing
+#some procedure for pre-processing
 # TODO - break the function up to pre-process, ROI, etc.
 def pre(image):
     t.s()
@@ -267,6 +281,11 @@ counter = 0;
 last_detection = None;
 avg_item = 0;
 avg_value = None;
+
+# this is the direct handler of a new image/frame
+# it decides whether to drop the frame or process it based on performance
+# this will be determined by loop frequence in real application
+# for now it just drop a fixed ratio of frames
 def pipeline(image):
     global last_detection
     global counter
@@ -291,6 +310,7 @@ def pipeline(image):
     else:
         return last_detection
 
+# debug routine for an image 
 def test_image(filename):
     test_image = cv2.imread(filename)
 

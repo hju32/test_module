@@ -110,11 +110,23 @@ class execution_timer:
 #sample usage        
 if __name__ == '__main__':
     from time import sleep
+    #Create an instance of exe_timer for all procedures you want to monitor
+    # Initialize with True to enable all functions
+    # When you're done analyzing, simply change the argument to False or 
+    # initialize without an argument, that will cause all methods to return instantly
     t = execution_timer(True)
 
+    # A typical scenario is to find average execution
+    # time during several iterations, average exe time will be 
+    # updated during each iteration
     for i in range(1,3):
+        # Start global timer in the very beginning of the procedure
         t.s()
 
+        # To track an operation, enclose it with INSTANCE.s('identifier')
+        # and INSTANCE.e('identifier')
+        # s and e are shorthand for start and end
+        # each start() must be matched with an end() with identical identifier
         t.s('sleep2')
         sleep(0.2)
         t.e('sleep2')
@@ -122,12 +134,17 @@ if __name__ == '__main__':
         t.s('sleep1')
         sleep(0.1)
         t.e('sleep1')
-        #unaccounted time
+
+        # not all operations in your procedure will be timed, those not timed are called
+        # unaccounted time
         sleep(1)
 
+        # it is also possible to track average value of a variable, this is how you do it.
         t.track('var', 5)
 
+        # at the end of the operation, end the global timer with a matching e()
         t.e()
+    # this function prints a summary of everything.
     t.summary()
         
         
