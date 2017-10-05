@@ -96,15 +96,16 @@ def findTarget(image, aoi = None):
     # Iterate through all labels 
     final_features = num_features
     t.track('num_features',num_features)
-    for i in range(1, num_features+1):
-        t.s('find labels')
-        # Find pixels with each label value
-        label = np.array(labels == i).astype(np.uint8)
-        nonzero = label.nonzero()
-        t.e('find labels')
 
-        # continue if this feature is removed by previous iterations
-        if (len(nonzero[0])<10):
+    for i in range(1, num_features+1):
+        
+        # Find pixels with each label value
+        t.s('find label')
+        label = np.array(labels == i).astype(np.uint8)
+        t.e('find label')
+
+        # continue if this feature is removed by previous iterations, or too small
+        if (not any((labels).ravel())):
             final_features = final_features-1
             continue
 
@@ -141,7 +142,7 @@ def findTarget(image, aoi = None):
         cv2.rectangle(labels, bbox[0], bbox[1],0, -1)
         t.e('draw box')
         
-    t.track('num_features',final_features)
+    t.track('final_features',final_features)
     
     return image
 
