@@ -121,7 +121,7 @@ class execution_timer:
         fraction = dict(self.s_avg)
         fraction.update((x, y/total_time) for x, y in fraction.items()) 
         for key,value in fraction.items():
-            print(key+'\t\t'+ "{0:.1f}".format(value*100)+' %'+'\t\t'+"{0:.2f}".format(value*total_time))
+            print(key+'\t\t'+ "{0:.1f}".format(value*100)+' %')
 
         unaccounted_time = 1-sum_time/total_time
         print('avg frequency = '+"{0:.3f}".format(1/self.g_duration_avg)+'Hz')

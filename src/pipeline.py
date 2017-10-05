@@ -102,19 +102,23 @@ def findTarget(image, aoi = None):
         label = np.array(labels == i).astype(np.uint8)
         nonzero = label.nonzero()
         t.e('find labels')
+
         # continue if this feature is removed by previous iterations
         if (len(nonzero[0])<10):
             final_features = final_features-1
             continue
 
-        t.s('find one contour')
+        t.s('find contour')
         im2, contours, hierarchy = cv2.findContours(label.copy(), cv2.RETR_EXTERNAL,
                                 cv2.CHAIN_APPROX_SIMPLE)
-        t.e('find one contour')
+        t.e('find contour')
 
+        t.s('draw contour')
         cv2.drawContours(image, contours, -1, (255,0,0), 3)
+        t.e('draw contour')
 
         continue
+
         # continue if this is not a convex shape
         '''
         if not cv2.isContourConvex(contours[0]):
