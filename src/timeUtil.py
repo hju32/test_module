@@ -4,10 +4,19 @@ class execution_timer:
     
     def __init__(self, enable = False):
         self.enabled = enable
-        # sectional time counting
-        self.t_start = {}
-        self.t_avg = {}
-        self.t_count = {}
+        # sectional time start time
+        self.s_start = {}
+        # average runtime, this is updated when a global section ends
+        self.s_avg = {}
+        # cumulative time consumption in one global section
+        self.cul = {}
+        
+        # global section count, this will be used as exe count for all sections
+        self.g_count = 0
+
+        # repetition in one global scope
+        self.s_rep_count = {}
+
         # global time counting
         self.g_start = None
         self.g_end = None
@@ -29,6 +38,7 @@ class execution_timer:
             return
         self.g_end = time()
         duration = self.g_end-self.g_start
+
         if (self.g_duration_avg is None):
             self.g_duration_avg = duration
             self.g_sample_count = 1
@@ -36,6 +46,17 @@ class execution_timer:
             self.g_duration_avg = self.g_duration_avg*self.g_sample_count+duration
             self.g_sample_count = self.g_sample_count +1
             self.g_duration_avg = self.g_duration_avg/self.g_sample_count
+
+        for key,value in self.cul.items():
+            if key in self.s_avg:
+                self.s_avg[key] = self.s_avg[key]*self.g_count+value
+                self.s_avg[key] = self.s_avg[key] / (self.g_count+1)
+            else:
+                self.s_avg[key] = value
+        self.cul = {}
+        self.g_count+=1
+        return
+
         return duration
         
     def track(self, name, var):
@@ -57,7 +78,7 @@ class execution_timer:
         if name is None:
             return self.global_start()
 
-        self.t_start[name] = time()
+        self.s_start[name] = time()
         return
 
     def end(self, name = None):
@@ -66,15 +87,15 @@ class execution_timer:
         if name is None:
             return self.global_end()
 
-        duration = time()-self.t_start[name] 
-        if name in self.t_avg:
-            self.t_avg[name] = self.t_avg[name]*self.t_count[name]+duration
-            self.t_count[name] = self.t_count[name] + 1
-            self.t_avg[name] = self.t_avg[name] / self.t_count[name]
+        duration = time()-self.s_start[name] 
+
+        if name in self.cul:
+            self.cul[name] += duration
+            self.s_rep_count[name] += 1
         else:
-            self.t_avg[name] = duration
-            self.t_count[name] = 1
-            
+            self.cul[name] = duration
+            self.s_rep_count[name] = 1
+
         return duration
 
     def s(self, n=None):
@@ -93,14 +114,14 @@ class execution_timer:
         print('-------Time-----------')
         #tracked times
         #note: sum_time is sum of all fractions not global time
-        sum_time = sum(self.t_avg.values())
+        sum_time = sum(self.s_avg.values())
         #g_duration_avg is time between start() and end() averaged
         total_time = self.g_duration_avg
         #make sure we don't mess with the original copy
-        fraction = dict(self.t_avg)
+        fraction = dict(self.s_avg)
         fraction.update((x, y/total_time) for x, y in fraction.items()) 
         for key,value in fraction.items():
-            print(key+'\t\t'+ "{0:.1f}".format(value*100)+' %')
+            print(key+'\t\t'+ "{0:.1f}".format(value*100)+' %'+'\t\t'+"{0:.2f}".format(value*total_time))
 
         unaccounted_time = 1-sum_time/total_time
         print('avg frequency = '+"{0:.3f}".format(1/self.g_duration_avg)+'Hz')
@@ -131,13 +152,14 @@ if __name__ == '__main__':
         sleep(0.2)
         t.e('sleep2')
 
-        t.s('sleep1')
-        sleep(0.1)
-        t.e('sleep1')
+        for j in range(1,3):
+            t.s('sleep1')
+            sleep(0.1)
+            t.e('sleep1')
 
         # not all operations in your procedure will be timed, those not timed are called
         # unaccounted time
-        sleep(1)
+        sleep(0.1)
 
         # it is also possible to track average value of a variable, this is how you do it.
         t.track('var', 5)
