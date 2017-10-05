@@ -14,9 +14,10 @@ import pickle
 import warnings
 from scipy.ndimage.measurements import label
 from moviepy.editor import VideoFileClip
+import collections
 
 from timeUtil import execution_timer
-t = execution_timer(False)
+t = execution_timer(True)
 
 #helper functions/routines
 
@@ -35,8 +36,8 @@ def showg(img):
     plt.imshow(img,cmap='gray')
     plt.show()
 # show heat image
-def show(img):
-    plt.imshow(img,cmap='heat')
+def showh(img):
+    plt.imshow(img,cmap='gist_heat')
     plt.show()
 
 # find area of interest in an image
@@ -47,19 +48,103 @@ def show(img):
 # For now you may ignore this
 
 # TODO - move what's in pre() here
+# image -> original RGB image
+# return: a labeled image as aoi and label count
+aoiType = collections.namedtuple('aoiType', ['labels', 'num_features'])
+
 def findAOI(image):
 
-    # do a histogram, find most common pixels
+    t.s('make mask')
+    mask = np.zeros([image.shape[0],image.shape[1]])
+    image = image.astype(np.int16)
+    mask = image[:,:,1]-(image[:,:,0]+image[:,:,1]+image[:,:,2])/3
+    #mask[mask<0] = 0
+    mask = mask<12
+    #return expand_grayimg(mask*100)
+    # obtained from testing
+    t.e('make mask')
 
     # label all special pixels
 
-    # draw box around special pixels
+    t.s('make labels')
+    # this variable defines pattern used to determine connectivity of features(none-zero pixles)
+    # see generate_binary_structure and binary_dilation for extension
+    connection = None
+    #label all remaining non-zero pixels, these SECTIONS are candidates for ROI
+    labels, num_features = label(mask, structure=connection)
+    t.e('make labels')
+    
+    # DEBUG
+    pickup_rate = len(labels.nonzero()[0])/(image.shape[0]*image.shape[1])
+    t.track('AOI pickup rate',pickup_rate)
+    #labels[labels!=0]= 200
+    #return expand_grayimg(labels)
 
-    return [image.shape]
+    return aoiType(labels, num_features)
 
 # main procedure to find target in image
 # for now it should draw visible marker around target
+# Current AOI format: non-AOI is zero, each section of AOI is labeled with a non-zero identifier
+# see findAOI() for definition
+# TODO - test how much performance increase is gained from aoi
 def findTarget(image, aoi = None):
+    if aoi is None:
+        aoi = aoiType(np.ones(image.shape[0],image.shape[1]),1)
+
+    num_features = aoi.num_features
+    labels = aoi.labels
+    # Iterate through all labels 
+    final_features = num_features
+    t.track('num_features',num_features)
+    for i in range(1, num_features+1):
+        t.s('find labels')
+        # Find pixels with each label value
+        label = np.array(labels == i).astype(np.uint8)
+        nonzero = label.nonzero()
+        t.e('find labels')
+        # continue if this feature is removed by previous iterations
+        if (len(nonzero[0])<10):
+            final_features = final_features-1
+            continue
+
+        t.s('find one contour')
+        im2, contours, hierarchy = cv2.findContours(label.copy(), cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_SIMPLE)
+        t.e('find one contour')
+
+        cv2.drawContours(image, contours, -1, (255,0,0), 3)
+
+        continue
+        # continue if this is not a convex shape
+        '''
+        if not cv2.isContourConvex(contours[0]):
+            final_features = final_features-1
+            continue
+        '''
+
+        t.s('find bounding rect')
+        # Identify x and y values of those pixels
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        # Define a bounding box based on min/max x and y
+        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+        t.e('find bounding rect')
+        t.s('draw box')
+        # Draw the box on the image
+        cv2.rectangle(image, bbox[0], bbox[1], (255,0,0), 3)
+        # remove this aoi from labels so we don't do unnecessary calculation
+        # this increase speed by 200%
+        cv2.rectangle(labels, bbox[0], bbox[1],0, -1)
+        t.e('draw box')
+        
+    t.track('num_features',final_features)
+    
+    return image
+
+    #for i in range(1,aoi.num_features+1):
+
+    mask = aoi.labels==i
+
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     kernel_size = 11
     gray_image = cv2.equalizeHist(gray_image)
@@ -140,12 +225,18 @@ def findTarget(image, aoi = None):
     edges = _edges
     return cv3.addWeighted(edges, w1, line_img, w2, 0)
 
-#XXX - reference only
-def box_around_labels(labels,num_features):
+#test function
+def box_around_labels(img, labels,num_features):
     # Iterate through all labels 
+    final_features = num_features
     for i in range(1, num_features+1):
-        # Find pixels with each car_number label value
-        nonzero = (labels[0] == car_number).nonzero()
+        # Find pixels with each label value
+        nonzero = (labels == i).nonzero()
+
+        # return if this feature is removed by previous iterations
+        if (len(nonzero[0])==0):
+            final_features = final_features-1
+            return img
         # Identify x and y values of those pixels
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
@@ -153,6 +244,11 @@ def box_around_labels(labels,num_features):
         bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
         # Draw the box on the image
         cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
+        # remove this aoi from labels so we don't do unnecessary calculation
+        # this increase speed by 200%
+        cv2.rectangle(labels, bbox[0], bbox[1],0, -1)
+        
+    t.track('num_features',final_features)
     # Return the image
     return img
 
@@ -293,10 +389,15 @@ def pipeline(image):
     global avg_value
     counter = counter + 1
     if (counter%2 == 0) | (last_detection is None):
-        t = time.time()
-        edges = findTarget(image)
+        loop_start_time = time.time()
+        
+        
+        t.s()
+        aoi = findAOI(image)
+        processed = findTarget(image,aoi)
+        t.e()
 
-        duration = time.time() - t
+        duration = time.time() - loop_start_time
         if (avg_value is None):
             avg_item = avg_item + 1
             avg_value = duration
@@ -305,7 +406,7 @@ def pipeline(image):
             avg_item = avg_item + 1
             avg_value = avg_value / avg_item
 
-        last_detection = edges
+        last_detection = processed
         return last_detection
     else:
         return last_detection
@@ -335,7 +436,7 @@ filename = "/Users/Nickzhang/uav_challenge/test_module/resources/hard/hard1.png"
 #test_image(filename)
 #exit()
 output_filename = "/Users/Nickzhang/uav_challenge/test_module/resources/output/output.mp4"
-clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/GOPR0002.MP4").subclip(70,73)
+clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/mavicjap.MOV").subclip(3,10)
 processed_clip = clip.fl_image(pipeline) #NOTE: this function expects color images!!
 processed_clip.write_videofile(output_filename, audio=False)
 print("average processing frequency = " + str(1/avg_value))
