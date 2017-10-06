@@ -82,153 +82,122 @@ def findAOI(image):
 
     return aoiType(labels, num_features)
 
+def distance(p1,p2):
+    dx = p1[0]-p2[0]
+    dy = p1[1]-p2[1]
+    return (dx**2+dy**2)**0.5
+
 # main procedure to find target in image
 # for now it should draw visible marker around target
 # Current AOI format: non-AOI is zero, each section of AOI is labeled with a non-zero identifier
 # see findAOI() for definition
 # TODO - test how much performance increase is gained from aoi
 def findTarget(image, aoi = None):
-    if aoi is None:
-        aoi = aoiType(np.ones(image.shape[0],image.shape[1]),1)
+    #if aoi is None:
+    #    aoi = aoiType(np.ones(image.shape[0],image.shape[1]),1)
 
-    num_features = aoi.num_features
-    labels = aoi.labels
-    # Iterate through all labels 
-    final_features = num_features
-    t.track('num_features',num_features)
-
-    for i in range(1, num_features+1):
-        
-        # Find pixels with each label value
-        t.s('find label')
-        label = np.array(labels == i).astype(np.uint8)
-        t.e('find label')
-
-        # continue if this feature is removed by previous iterations, or too small
-        if (not any((labels).ravel())):
-            final_features = final_features-1
-            continue
-
-        t.s('find contour')
-        im2, contours, hierarchy = cv2.findContours(label.copy(), cv2.RETR_EXTERNAL,
-                                cv2.CHAIN_APPROX_SIMPLE)
-        t.e('find contour')
-
-        t.s('draw contour')
-        cv2.drawContours(image, contours, -1, (255,0,0), 3)
-        t.e('draw contour')
-
-        continue
-
-        # continue if this is not a convex shape
-        '''
-        if not cv2.isContourConvex(contours[0]):
-            final_features = final_features-1
-            continue
-        '''
-
-        t.s('find bounding rect')
-        # Identify x and y values of those pixels
-        nonzeroy = np.array(nonzero[0])
-        nonzerox = np.array(nonzero[1])
-        # Define a bounding box based on min/max x and y
-        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
-        t.e('find bounding rect')
-        t.s('draw box')
-        # Draw the box on the image
-        cv2.rectangle(image, bbox[0], bbox[1], (255,0,0), 3)
-        # remove this aoi from labels so we don't do unnecessary calculation
-        # this increase speed by 200%
-        cv2.rectangle(labels, bbox[0], bbox[1],0, -1)
-        t.e('draw box')
-        
-    t.track('final_features',final_features)
-    
-    return image
-
-    #for i in range(1,aoi.num_features+1):
-
-    mask = aoi.labels==i
-
+    t.s('cvtC+Caussian')
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    kernel_size = 11
-    gray_image = cv2.equalizeHist(gray_image)
-    gray_image = cv2.GaussianBlur(gray_image, (kernel_size, kernel_size), 0)
+    kernel_size = 9
+    gauss_gray_image = cv2.GaussianBlur(gray_image, (kernel_size, kernel_size), 0)
+    t.e('cvtC+Caussian')
 
     #find edge & contour
+    # if we do hist balance
     #low_threshold = 800
     #high_threshold = 1200
-    low_threshold = 150
-    high_threshold = 300
-    edges = cv2.Canny(gray_image, low_threshold, high_threshold)
-    im2, contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_EXTERNAL,
-                                cv2.CHAIN_APPROX_SIMPLE)
-    #cv2.drawContours(image, contours, -1, [0,0,255], 3)
-    #return image
+    t.s('canny')
+    low_threshold = 100
+    high_threshold = 200
+    edges = cv2.Canny(gauss_gray_image, low_threshold, high_threshold)
+    t.e('canny')
 
-    color = [0,0,255]
+    t.s('fd cont')
+    im2, contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_TC89_L1)
+    t.e('fd cont')
+
     # XXX- if countours = NOne
     # TODO - can we do this vector style?
+    target_count = 0
     for c in contours:
+        t.s('arclen')
         peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.03*peri, True)
-        if  True or (len(approx)>=4 and len(approx)<=9):
-            # use the bounding box to compute the aspect ratio
-            # box = ( center (x,y), (width, height), angle of rotation )
-            box = cv2.minAreaRect(approx)
-            points = cv2.boxPoints(box)
+        convex = cv2.convexHull(c)
+        conv_peri = cv2.arcLength(convex, True)
+        t.e('arclen')
 
-            # restrict aspect ratio
-            _, (w,h), _ = box
-            #was 8
-            if (w<5) or (h<5):
-                continue
+        # continue if it's not really a convex shape
+        if (peri>conv_peri*1.1):
+            continue
+        
+        t.s('minAreaRect')
+        box = cv2.minAreaRect(c)
+        points = cv2.boxPoints(box)
+        t.e('minAreaRect')
 
-            aspectRatio = max(w,h)/min(w,h)
- 
-            #compute the solidity of the original contour
-            area = cv2.contourArea(c)
-            hullArea = cv2.contourArea(cv2.convexHull(c))
-            solidity = area / float(hullArea)
+        _, (w,h), _ = box
+        # remove noise and prevent div by zero
+        if (w<5) or (h<5):
+            continue
+        # we know the longer edge would be at least 15 pixels, at current configuration
+        if max(w,h)<12:
+            continue
 
-            if  (solidity > 0.5 and aspectRatio<1.5 and aspectRatio > 1.1):
+        # restrict aspect ratio
+        aspectRatio = max(w,h)/min(w,h)
 
-                color = [0,0,255]
-                # draw all contours(only one)
-                contourIdx = -1;
-                thickness = 2
-                box2draw = [np.int0(points)]
-                cv2.drawContours(image, box2draw, contourIdx, color, thickness)
-                color = [255,0,0]
-                cv2.drawContours(image, cv2.convexHull(c), contourIdx, color, thickness)
-                
+        #compute the solidity of the original contour
+        area = cv2.contourArea(c)
+        hullArea = cv2.contourArea(convex)
+        solidity = area / float(hullArea)
+
+        if  (solidity < 0.9 or aspectRatio>1.5 or aspectRatio < 1.1):
+            continue
+
+        contourIdx = -1;
+        thickness = 2
+        color = [0,0,255]
+        box2draw = np.int0([points])
+
+        t.s('validation')
+        # final check
+        centerx = np.average(box2draw[0,:,0])
+        centery = np.average(box2draw[0,:,1])
+        d1 = distance(box2draw[0,0],box2draw[0,2])
+        d2 = distance(box2draw[0,1],box2draw[0,3])
+        diagonal = np.average([d1,d2])
+        radius = diagonal*0.35/2
+
+        roi = np.zeros([image.shape[0],image.shape[1]], dtype=np.uint8)
+        cv2.circle(roi,(int(centerx),int(centery)),int(radius),1,-1)
+        color_center = cv2.mean(gray_image,roi)[0]
+
+        roi = np.zeros([image.shape[0],image.shape[1]], dtype=np.uint8)
+        cv2.drawContours(roi, box2draw, contourIdx, 1, -1)
+        cv2.circle(roi,(int(centerx),int(centery)),int(radius),-1,-1)
+        color_edge = cv2.mean(gray_image,roi)[0]
+
+        t.track('color center',color_center)
+        t.track('color edge',color_edge)
+        t.e('validation')
+        if not (color_center+20<color_edge):
+            t.track('bad edge',color_edge)
+            t.track('bad center',color_center)
+            continue
+
+        cv2.drawContours(image, box2draw, contourIdx, color, thickness)
+        cv2.circle(image,(int(centerx),int(centery)),3*int(radius),[255,0,0],5)
+        target_count +=1
+
+    # only tracks if we actually find at least one target
+    if target_count>=1:
+        t.track('target count',target_count)
+
+        
 
     return image
 
-    plt.imshow(edges,cmap='gray')
-    plt.show()
-    #XXX - min_line, max_line need to be dynamically calculated form size of AOI
-    rho = 1
-    theta = np.pi/180*3
-    threshold = 7
-    min_line_len = 5
-    max_line_gap = 30
-    
-    lines = cv2.HoughLinesP(edges, rho, theta, threshold, np.array([]), minLineLength=min_line_len, maxLineGap=max_line_gap)
-    line_img = np.zeros((gray_image.shape[0], gray_image.shape[1], 3), dtype=np.uint8)
-    if lines is not None:
-        draw_lines(line_img, lines)
-    
-    w1 = 0.5
-    w2 = 0.5
-
-    #cv2.addWeighted(image, w1, line_img, w2, 0)
-    _edges = np.zeros([edges.shape[0],edges.shape[1],3], dtype=np.uint8)
-    _edges[:,:,0] = edges
-    _edges[:,:,1] = edges
-    _edges[:,:,2] = edges
-    edges = _edges
-    return cv3.addWeighted(edges, w1, line_img, w2, 0)
 
 #test function
 def box_around_labels(img, labels,num_features):
@@ -396,10 +365,8 @@ def pipeline(image):
     if (counter%2 == 0) | (last_detection is None):
         loop_start_time = time.time()
         
-        
         t.s()
-        aoi = findAOI(image)
-        processed = findTarget(image,aoi)
+        processed = findTarget(image)
         t.e()
 
         duration = time.time() - loop_start_time
@@ -441,7 +408,7 @@ filename = "/Users/Nickzhang/uav_challenge/test_module/resources/hard/hard1.png"
 #test_image(filename)
 #exit()
 output_filename = "/Users/Nickzhang/uav_challenge/test_module/resources/output/output.mp4"
-clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/mavicjap.MOV").subclip(3,10)
+clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/mavicjap.MOV").subclip(3,90)
 processed_clip = clip.fl_image(pipeline) #NOTE: this function expects color images!!
 processed_clip.write_videofile(output_filename, audio=False)
 print("average processing frequency = " + str(1/avg_value))
