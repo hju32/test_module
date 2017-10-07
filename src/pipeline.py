@@ -1,8 +1,8 @@
-# Vision Template
+# Target detection code for dot target
 # Created by Nick Zhang
 
-# This file includes common methods used in Gatech DBF MedExpress, 
-# it should be the start point for different target candidates.
+# This file includes standard routines used in Gatech DBF MedExpress vision team
+# it should be the start point for your code if you decide to implement different target pipelines
  
 import numpy as np
 import time
@@ -51,36 +51,6 @@ def showh(img):
 # image -> original RGB image
 # return: a labeled image as aoi and label count
 aoiType = collections.namedtuple('aoiType', ['labels', 'num_features'])
-
-def findAOI(image):
-
-    t.s('make mask')
-    mask = np.zeros([image.shape[0],image.shape[1]])
-    image = image.astype(np.int16)
-    mask = image[:,:,1]-(image[:,:,0]+image[:,:,1]+image[:,:,2])/3
-    #mask[mask<0] = 0
-    mask = mask<12
-    #return expand_grayimg(mask*100)
-    # obtained from testing
-    t.e('make mask')
-
-    # label all special pixels
-
-    t.s('make labels')
-    # this variable defines pattern used to determine connectivity of features(none-zero pixles)
-    # see generate_binary_structure and binary_dilation for extension
-    connection = None
-    #label all remaining non-zero pixels, these SECTIONS are candidates for ROI
-    labels, num_features = label(mask, structure=connection)
-    t.e('make labels')
-    
-    # DEBUG
-    pickup_rate = len(labels.nonzero()[0])/(image.shape[0]*image.shape[1])
-    t.track('AOI pickup rate',pickup_rate)
-    #labels[labels!=0]= 200
-    #return expand_grayimg(labels)
-
-    return aoiType(labels, num_features)
 
 def distance(p1,p2):
     dx = p1[0]-p2[0]
@@ -236,123 +206,13 @@ def expand_grayimg(image):
     image = _image
     return image
 
-#some procedure for pre-processing
-# TODO - break the function up to pre-process, ROI, etc.
-def pre(image):
-    t.s()
-
-    t.s("convert color")
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    t.e("convert color")
-
-    kernel_size = 17
-
-    t.s("Gaussian Blur")
-    gray = cv2.GaussianBlur(gray, (kernel_size, kernel_size), 0)
-    t.e("Gaussian Blur")
-
-    #reduce color
-    gray = gray//10*10
-
-    #reduce scale, calculate background, find mode
-    thumbnail = cv2.resize(gray, (40,20), interpolation = cv2.INTER_NEAREST)
-    thumbnail = thumbnail.ravel()
-    value, count = np.unique(thumbnail, return_counts = True)
-    sort_index = np.argsort(count)
-    # the most frequent 6 colors are considered mode
-    mode = sort_index[-6:]
-    mode = value[mode]
-
-    t.s("make mode mask")
-    #one for all non-mode pixels
-    mask = np.isin(gray, mode, invert=True).astype(np.uint8)
-    mask = mask*255
-
-    low_threshold = 200
-    high_threshold = 300
-    edges = cv2.Canny(mask, low_threshold, high_threshold)
-    im2, contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_EXTERNAL,
-                                cv2.CHAIN_APPROX_SIMPLE)
-
-    kernel_size = 10
-    #mask = cv2.GaussianBlur(mask,  (kernel_size, kernel_size), 10)
-    mask = cv2.blur(mask, (kernel_size, kernel_size))
-    threshold = 100
-    mask[mask<=threshold] = 0
-    t.e("make mode mask")
-
-    # this variable defines pattern used to determine connectivity of features(none-zero pixles)
-    # see generate_binary_structure and binary_dilation for extension
-    connection = None
-    #label all remaining non-zero pixels, these SECTIONS are candidates for ROI
-    labels, num_features = label(mask, structure=connection)
-
-
-    # initialization done for performance improvement
-    # there is more than enough space since some labels will be discarded
-    roi = np.zeros([num_features, 2, 2])
-    roi_count = 0
-
-    t.s("draw all box")
-    t.track('num_features', num_features)
-    for i in range(1,num_features+1):
-
-        t.s('get coords')
-        # coordinates for all pixels
-        coordinates = np.array((labels==i).astype(np.uint8).nonzero())
-        num_pixels = coordinates.shape[1]
-        t.e('get coords')
-
-        #eliminate sections with too few 'hot' pixels, this should filter out random dots.
-        if (num_pixels < 100):
-            continue
-        
-        t.s('cvt2numpy')
-        # ---  draw a box around the hot pixels
-        # Identify x and y values of those pixels
-        nonzeroy = np.array(coordinates[0])
-        nonzerox = np.array(coordinates[1])
-        t.e('cvt2numpy')
-
-        # Define a bounding box based on min/max x and y
-        t.s('find one box')
-        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
-        bbox_size = (bbox[1][1]-bbox[0][1])*(bbox[1][0]-bbox[0][0])
-        t.e('find one box')
-
-        # filter out sparce & tiny sections
-        t.s('kill low occ')
-        occupance = num_pixels / bbox_size
-        if (occupance > 0.6) and (bbox_size > 150) :
-            roi[roi_count] = bbox
-            roi_count = roi_count + 1
-        t.e('kill low occ')
-
-        t.s('draw one box')
-        if (roi_count > 0):
-            # --- DEBUG
-            # Draw the box on the image
-            cv2.rectangle(image, bbox[0], bbox[1], (0,0,255), 4)
-        t.e('draw one box')
-
-    t.e("draw all box")
-    t.track('boxes',roi_count)
-
-    ##### ---- DEBUG
-    #print(len(value))
-    #plt.figure();
-    #plt.bar( np.arange(len(value) ), count, align='center' )
-    #plt.show()
-    t.e()
-    return image
-
 #drop some frames to speed things up
 counter = 0;
 last_detection = None;
 avg_item = 0;
 avg_value = None;
 
-# this is the direct handler of a new image/frame
+# this is the direct callback handler of a new image/frame
 # it decides whether to drop the frame or process it based on performance
 # this will be determined by loop frequence in real application
 # for now it just drop a fixed ratio of frames
@@ -362,7 +222,7 @@ def pipeline(image):
     global avg_item
     global avg_value
     counter = counter + 1
-    if (counter%2 == 0) | (last_detection is None):
+    if True |(counter%2 == 0) | (last_detection is None):
         loop_start_time = time.time()
         
         t.s()
@@ -408,7 +268,7 @@ filename = "/Users/Nickzhang/uav_challenge/test_module/resources/hard/hard1.png"
 #test_image(filename)
 #exit()
 output_filename = "/Users/Nickzhang/uav_challenge/test_module/resources/output/output.mp4"
-clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/mavicjap.MOV").subclip(3,90)
+clip = VideoFileClip("/Users/Nickzhang/uav_challenge/test_module/resources/DJI_0001.MOV")
 processed_clip = clip.fl_image(pipeline) #NOTE: this function expects color images!!
 processed_clip.write_videofile(output_filename, audio=False)
 print("average processing frequency = " + str(1/avg_value))
